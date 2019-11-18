@@ -12,7 +12,8 @@ import (
 // Notify sends desktop notification.
 //
 // On Linux it tries to send notification via D-Bus and it will fallback to `notify-send` binary.
-func Notify(title, message, appIcon string) error {
+// uregency: 0 low, 1 normal, 2 critical
+func Notify(title, message, appIcon string, urgency int) error {
 	appIcon = pathAbs(appIcon)
 
 	cmd := func() error {
@@ -23,8 +24,17 @@ func Notify(title, message, appIcon string) error {
 				return err
 			}
 		}
+		var nsUrgency string
+		switch urgency {
+		case 0:
+			nsUrgency = "low"
+		case 1:
+			nsUrgency = "normal"
+		case 2:
+			nsUrgency = "critical"
+		}
 
-		c := exec.Command(send, title, message, "-i", appIcon)
+		c := exec.Command(send, "-u", nsUrgency, title, message, "-i", appIcon)
 		return c.Run()
 	}
 
@@ -43,7 +53,8 @@ func Notify(title, message, appIcon string) error {
 	}
 	obj := conn.Object("org.freedesktop.Notifications", dbus.ObjectPath("/org/freedesktop/Notifications"))
 
-	call := obj.Call("org.freedesktop.Notifications.Notify", 0, "", uint32(0), appIcon, title, message, []string{}, map[string]dbus.Variant{}, int32(-1))
+	call := obj.Call("org.freedesktop.Notifications.Notify", 0, "", uint32(0),
+		appIcon, title, message, []string{}, map[string]dbus.Variant{"urgency": dbus.MakeVariant(byte(urgency))}, int32(-1))
 	if call.Err != nil {
 		e := cmd()
 		if e != nil {
